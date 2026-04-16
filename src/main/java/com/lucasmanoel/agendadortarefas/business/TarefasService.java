@@ -1,9 +1,9 @@
 package com.lucasmanoel.agendadortarefas.business;
 
-import com.lucasmanoel.agendadortarefas.business.dto.TarefasDTO;
+import com.lucasmanoel.agendadortarefas.business.dto.TarefasDTORecords;
 import com.lucasmanoel.agendadortarefas.business.mapper.TarefaUpdateConverter;
 import com.lucasmanoel.agendadortarefas.business.mapper.TarefasConveter;
-import com.lucasmanoel.agendadortarefas.infrastructure.ResourceNotFoudException;
+import com.lucasmanoel.agendadortarefas.infrastructure.exceptions.ResourceNotFoundException;
 import com.lucasmanoel.agendadortarefas.infrastructure.entity.TarefasEntity;
 import com.lucasmanoel.agendadortarefas.infrastructure.enums.StatusNotificacaoEnum;
 import com.lucasmanoel.agendadortarefas.infrastructure.repository.TarefasRepository;
@@ -23,20 +23,20 @@ public class TarefasService {
     private final JwtUtil jwtUtil;
     private final TarefaUpdateConverter tarefaUpdateConverter;
 
-    public TarefasDTO gravaTarefa(String token, TarefasDTO dto){
+    public TarefasDTORecords gravaTarefa(String token, TarefasDTORecords dto){
         String email = jwtUtil.extrairEmailToken(token.substring(7));
-        dto.setDataCriacao(LocalDateTime.now());
-        dto.setStatusNotificacaoEnum(StatusNotificacaoEnum.PENDENTE);
-        dto.setEmail(email);
-        TarefasEntity entity = tarefaConveter.paraTarefaEntity(dto);
+        TarefasDTORecords dtofinal = new TarefasDTORecords(null, dto.nome(),
+                dto.descricao(), LocalDateTime.now(), dto.dataEvento(), email, null,
+                StatusNotificacaoEnum.PENDENTE);
+        TarefasEntity entity = tarefaConveter.paraTarefaEntity(dtofinal);
         return tarefaConveter.paraTerefaDTO(tarefasRepository.save(entity));
     }
 
-    public List<TarefasDTO> buscaListaTarefas(LocalDateTime dataInicial, LocalDateTime dataFinal){
-        return tarefaConveter.paraListaTerefasDTO(tarefasRepository.findByDataEventoBetween(dataInicial, dataFinal));
+    public List<TarefasDTORecords> buscaTarefasAgendadasPorPeriodo(LocalDateTime dataInicial, LocalDateTime dataFinal, StatusNotificacaoEnum status){
+        return tarefaConveter.paraListaTerefasDTO(tarefasRepository.findByDataEventoBetweenAndStatusNotificacaoEnum(dataInicial, dataFinal, StatusNotificacaoEnum.PENDENTE));
     }
 
-    public List<TarefasDTO> busaListaTarefasEmail(String token){
+    public List<TarefasDTORecords> busaListaTarefasEmail(String token){
         String email = jwtUtil.extrairEmailToken(token.substring(7));
         return tarefaConveter.paraListaTerefasDTO(tarefasRepository.findByEmail(email));
     }
@@ -44,23 +44,26 @@ public class TarefasService {
     public void deletaTarefaId(String id){
         try {
             tarefasRepository.deleteById(id);
-        } catch (ResourceNotFoudException e) {
-            throw new ResourceNotFoudException("Id não encontrado!"+ e.getCause());
+        } catch (ResourceNotFoundException e) {
+            throw new ResourceNotFoundException("Id não encontrado!"+ e.getCause());
         }
     }
-    public TarefasDTO alteraStatus(StatusNotificacaoEnum status, String id){
+    public TarefasDTORecords alteraStatus(StatusNotificacaoEnum status, String id){
         TarefasEntity entity = tarefasRepository.findById(id).orElseThrow(
-                () -> new ResourceNotFoudException("ID não encontrado")
+                () -> new ResourceNotFoundException("ID não encontrado")
         );
         entity.setStatusNotificacaoEnum(status);
         return tarefaConveter.paraTerefaDTO(tarefasRepository.save(entity));
     }
-    public TarefasDTO updateTarefa(TarefasDTO dto, String id){
-        TarefasEntity entity = tarefasRepository.findById(id).orElseThrow(
-                () -> new ResourceNotFoudException("ID não encontrado")
-        );
-        dto.setDataAlteracao(LocalDateTime.now());
-        tarefaUpdateConverter.updateTarefas(dto, entity);
-        return tarefaConveter.paraTerefaDTO(tarefasRepository.save(entity));
+    public TarefasDTORecords updateTarefa(TarefasDTORecords dto, String id){
+        try {
+            TarefasEntity entity = tarefasRepository.findById(id).orElseThrow(
+                    () -> new ResourceNotFoundException("ID não encontrado")
+            );
+            tarefaUpdateConverter.updateTarefas(dto, entity);
+            return tarefaConveter.paraTerefaDTO(tarefasRepository.save(entity));
+        }catch (ResourceNotFoundException e){
+            throw new ResourceNotFoundException("Erro ao alterar status da tarefa");
+        }
     }
 }
