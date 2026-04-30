@@ -1,8 +1,6 @@
 package com.lucasmanoel.agendadortarefas.infrastructure.exceptions;
 
-import javax.naming.AuthenticationException;
-
-public class UnauthorizedException extends AuthenticationException {
+public class UnauthorizedException extends RuntimeException {
     public UnauthorizedException(String message, Throwable throwable) {
         super(message);
     }
